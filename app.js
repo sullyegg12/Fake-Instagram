@@ -759,7 +759,7 @@ function openPostDetail(accountId, postId, carouselIdx){
     const total = commentTotal(post);
 
     const mediaHtml = imgs.length ? `
-    <div class="pd-media">
+    <div class="pd-media" id="pdMediaEl">
       <img src="${imgs[idx]}">
       ${imgs.length>1?`
         ${idx>0?`<button class="arrow left" onclick="openPostDetail('${accountId}','${postId}',${idx-1})">${ic('chevronLeft',18)}</button>`:''}
@@ -814,6 +814,13 @@ function openPostDetail(accountId, postId, carouselIdx){
       </div>
     </div>`;
     openBottomSheet(html, 'sheet-panel--tall');
+    if(imgs.length>1){
+        const mediaEl = document.getElementById('pdMediaEl');
+        attachSwipe(mediaEl,
+            ()=>{ if(idx<imgs.length-1) openPostDetail(accountId, postId, idx+1); },
+            ()=>{ if(idx>0) openPostDetail(accountId, postId, idx-1); }
+        );
+    }
 }
 function updateLikes(accountId, postId){
     const post = acc(accountId).posts.find(p=>p.id===postId);
