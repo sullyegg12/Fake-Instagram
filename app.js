@@ -19,7 +19,10 @@ function ic(name, size, strokeWidth){
         upload:`<svg ${base}><path d="M12 4v11"/><polyline points="7.5 8.5 12 4 16.5 8.5"/><path d="M5 20h14"/></svg>`,
         download:`<svg ${base}><path d="M12 4v11"/><polyline points="7.5 11 12 15.5 16.5 11"/><path d="M5 20h14"/></svg>`,
         grid:`<svg ${base}><rect x="3" y="3" width="7.5" height="7.5" rx="1.2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.2"/></svg>`,
-        camera:`<svg ${base}><path d="M4 8.5a1.5 1.5 0 0 1 1.5-1.5h1.9l1-1.7a1 1 0 0 1 .9-.5h5.4a1 1 0 0 1 .9.5l1 1.7h1.9A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5z"/><circle cx="12" cy="13" r="3.5"/></svg>`
+        camera:`<svg ${base}><path d="M4 8.5a1.5 1.5 0 0 1 1.5-1.5h1.9l1-1.7a1 1 0 0 1 .9-.5h5.4a1 1 0 0 1 .9.5l1 1.7h1.9A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5z"/><circle cx="12" cy="13" r="3.5"/></svg>`,
+        send:`<svg ${base}><line x1="21" y1="3" x2="10.5" y2="13.5"/><path d="M21 3 14.5 21c-.15.4-.7.4-.9 0L10.5 13.5 3 10.4c-.4-.15-.4-.7 0-.9L21 3Z"/></svg>`,
+        bookmark:`<svg ${base}><path d="M6.5 3.5h11a1 1 0 0 1 1 1V21l-6.5-4-6.5 4V4.5a1 1 0 0 1 1-1Z"/></svg>`,
+        dotsHoriz:`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>`
     };
     return icons[name] || '';
 }
@@ -41,7 +44,7 @@ function nowTs(){ return Date.now(); }
 function blankAccount(id, username, displayName){
     return {
         id, username, displayName, bio:'', avatar:'',
-        followers:0, followingIds:[], posts:[]
+        followers:0, followingBase:0, followingIds:[], posts:[]
     };
 }
 
@@ -68,11 +71,8 @@ try{
     storageAvailable = false;
 }
 function saveState(){
-    try{
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    }catch(e){
-        storageAvailable = false;
-    }
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+    catch(e){ storageAvailable = false; }
 }
 
 /* ============================= HELPERS ============================= */
@@ -96,11 +96,12 @@ function escapeHtml(s){
 }
 function timeAgo(ts){
     const s = Math.floor((Date.now()-ts)/1000);
-    if(s<60) return 'just now';
-    const m = Math.floor(s/60); if(m<60) return m+'m';
-    const h = Math.floor(m/60); if(h<24) return h+'h';
-    const d = Math.floor(h/24); if(d<7) return d+'d';
-    return new Date(ts).toLocaleDateString();
+    if(s<60) return 'Posted just now';
+    const m = Math.floor(s/60); if(m<60) return `Posted ${m} minute${m!==1?'s':''} ago`;
+    const h = Math.floor(m/60); if(h<24) return `Posted ${h} hour${h!==1?'s':''} ago`;
+    const d = Math.floor(h/24); if(d<30) return `Posted ${d} day${d!==1?'s':''} ago`;
+    const mo = Math.floor(d/30); if(mo<12) return `Posted ${mo} month${mo!==1?'s':''} ago`;
+    const y = Math.floor(mo/12); return `Posted ${y} year${y!==1?'s':''} ago`;
 }
 function commentTotal(post){ return (post.comments?post.comments.length:0) + (Number(post.extraComments)||0); }
 function showToast(msg){
@@ -145,7 +146,7 @@ function renderTopAvatar(){
     const a = mainAcc();
     document.getElementById('topAvatarWrap').innerHTML = avaCircle(a,26);
     const navSlot = document.getElementById('navProfileAvaWrap');
-    navSlot.innerHTML = avaCircle(a,24);
+    navSlot.innerHTML = ic('user',24);
     navSlot.classList.toggle('active', state.view==='profile' && state.currentViewAccountId===state.mainId);
 }
 
@@ -156,11 +157,13 @@ function render(){
     const app = document.getElementById('app');
     if(state.view === 'feed'){
         app.innerHTML = renderFeedHTML();
+    } else if(state.view === 'postpage'){
+        app.innerHTML = renderPostPageHTML(state.postPageAccountId, state.postPagePostId);
     } else {
         app.innerHTML = renderProfileHTML(state.currentViewAccountId);
     }
     document.getElementById('navFeed').classList.toggle('active', state.view==='feed');
-    document.getElementById('navProfile').classList.toggle('active', state.view==='profile');
+    document.getElementById('navProfile').classList.toggle('active', state.view==='profile' || state.view==='postpage');
 }
 
 /* ============================= FEED ============================= */
@@ -190,36 +193,42 @@ function renderFeedHTML(){
     return `<div style="padding-top:14px;">` + posts.map(({post,account})=> renderPostCard(post,account)).join('') + `</div>`;
 }
 
-function renderPostCard(post, account){
+function renderPostCard(post, account, restricted){
     const total = commentTotal(post);
+    const goProfileAttr = restricted ? '' : `onclick="goProfile('${account.id}')"`;
     return `
   <div class="post-card">
     <div class="post-head">
-      <a onclick="goProfile('${account.id}')">${avaCircle(account,32)}</a>
-      <div class="who" onclick="goProfile('${account.id}')">
+      <a ${goProfileAttr} style="${restricted?'cursor:default;':''}">${avaCircle(account,32)}</a>
+      <div class="who" ${goProfileAttr} style="${restricted?'cursor:default;':''}">
         <b>${escapeHtml(account.username)}</b>
       </div>
-      <button class="more" onclick="openPostMenu('${account.id}','${post.id}')" aria-label="Post options">${ic('dots',20)}</button>
+      ${restricted?'':`<button class="more" onclick="openPostActionSheet('${account.id}','${post.id}')" aria-label="Post options">${ic('dotsHoriz',20)}</button>`}
     </div>
-    ${renderPostMedia(post)}
+    ${renderPostMedia(post, 0, account.id, post.id)}
     <div class="post-actions">
-      <button title="Likes" aria-label="Likes">${ic('heart',24)}</button>
-      <button title="Comments" aria-label="Comments" onclick="openPostDetail('${account.id}','${post.id}')">${ic('comment',24)}</button>
+      <button title="Likes" aria-label="Likes">${ic('heart',24)}<span class="count">${fmtNum(post.likes||0)}</span></button>
+      <button title="Comments" aria-label="Comments" onclick="openPostDetail('${account.id}','${post.id}')">${ic('comment',24)}<span class="count">${fmtNum(total)}</span></button>
+      <button title="Shares" aria-label="Shares">${ic('send',23)}<span class="count">${fmtNum(post.shares||0)}</span></button>
+      <button title="Save" aria-label="Save" style="margin-left:auto;">${ic('bookmark',23)}</button>
     </div>
-    <div class="post-likes" title="${fmtNumFull(post.likes||0)} likes">${fmtNum(post.likes||0)} likes</div>
+    <div class="post-stats-line" title="${fmtNumFull(post.likes||0)} likes, ${fmtNumFull(total)} comments, ${fmtNumFull(post.shares||0)} shares, ${fmtNumFull(post.views||0)} views" onclick="openPostDetail('${account.id}','${post.id}')">
+      <b>${fmtNum(post.likes||0)}</b> likes &nbsp;&middot;&nbsp; <b>${fmtNum(total)}</b> comments &nbsp;&middot;&nbsp; <b>${fmtNum(post.shares||0)}</b> shares &nbsp;&middot;&nbsp; <b>${fmtNum(post.views||0)}</b> views
+    </div>
     ${post.caption ? `<div class="post-caption"><b>${escapeHtml(account.username)}</b>${escapeHtml(post.caption)}</div>` : ''}
-    ${total>0 ? `<button class="post-comments-link" onclick="openPostDetail('${account.id}','${post.id}')">View all ${fmtNum(total)} comments</button>` : ''}
     <div class="post-time">${timeAgo(post.timestamp)}</div>
   </div>`;
 }
 
-function renderPostMedia(post, carouselIdx){
+function renderPostMedia(post, carouselIdx, accountId, postId){
     const imgs = post.images||[];
     const idx = carouselIdx||0;
     if(imgs.length===0){
         return `<div class="post-media"><span class="noimg">No image</span></div>`;
     }
-    const dots = imgs.length>1 ? `<div class="dots">${imgs.map((_,i)=>`<span class="${i===idx?'on':''}"></span>`).join('')}</div>` : '';
+    const dots = imgs.length>1 ? `<div class="dots">${imgs.map((_,i)=>
+        `<button class="${i===idx?'on':''}" onclick="event.stopPropagation();openPostDetail('${accountId}','${postId}',${i})"></button>`
+    ).join('')}</div>` : '';
     const count = imgs.length>1 ? `<div class="img-count">${idx+1}/${imgs.length}</div>` : '';
     return `<div class="post-media" data-idx="${idx}" data-count="${imgs.length}">
       <img src="${imgs[idx]}">
@@ -232,6 +241,31 @@ function goProfile(accountId){
     state.currentViewAccountId = accountId;
     state.view = 'profile';
     render();
+}
+
+/* ============================= PAGE ========================*/
+function openPostPage(accountId, postId){
+    state.view = 'postpage';
+    state.postPageAccountId = accountId;
+    state.postPagePostId = postId;
+    render();
+}
+function backFromPostPage(){
+    state.view = 'profile';
+    render();
+}
+function renderPostPageHTML(accountId, postId){
+    const a = acc(accountId);
+    const post = a && a.posts.find(p=>p.id===postId);
+    if(!post){
+        return `<div class="empty-state"><p>Post not found.</p><button class="btn" onclick="backFromPostPage()" style="margin-top:10px;">Go back</button></div>`;
+    }
+    return `
+    <div class="postpage-topbar">
+      <button class="back-btn" onclick="backFromPostPage()" aria-label="Back">${ic('chevronLeft',22)}</button>
+      <b>Post</b>
+    </div>
+    ${renderPostCard(post, a, true)}`;
 }
 
 /* ============================= PROFILE ============================= */
@@ -248,7 +282,7 @@ function renderProfileHTML(accountId){
       <div class="profile-stats">
         <div class="stat"><b title="${fmtNumFull(a.posts.length)}">${fmtNum(a.posts.length)}</b><span>posts</span></div>
         <div class="stat"><b title="${fmtNumFull(a.followers)}">${fmtNum(a.followers)}</b><span>followers</span></div>
-        <button class="stat" onclick="openFollowingModal('${a.id}')"><b title="${fmtNumFull(a.followingIds.length)}">${fmtNum(a.followingIds.length)}</b><span>following</span></button>
+        <button class="stat" onclick="openFollowingModal('${a.id}')"><b title="${fmtNumFull((a.followingBase||0)+a.followingIds.length)}">${fmtNum((a.followingBase||0)+a.followingIds.length)}</b><span>following</span></button>
       </div>
     </div>
   </div>
@@ -371,6 +405,15 @@ function openModal(html, wide){
 function closeModal(){
     document.getElementById('modalRoot').innerHTML = '';
 }
+function openBottomSheet(html, extraClass){
+    document.getElementById('modalRoot').innerHTML = `
+    <div class="overlay sheet-overlay" id="genericOverlay">
+      <div class="sheet-panel ${extraClass||''}">${html}</div>
+    </div>`;
+    document.getElementById('genericOverlay').addEventListener('mousedown', (e)=>{
+        if(e.target.id==='genericOverlay') closeModal();
+    });
+}
 
 /* ============================= EDIT PROFILE ============================= */
 function openEditProfileModal(accountId){
@@ -403,6 +446,11 @@ function openEditProfileModal(accountId){
         <input type="number" id="epFollowers" value="${a.followers}" min="0">
         <div class="hint">Set this to whatever follower count you want shown on the profile.</div>
       </div>
+      <div class="field">
+        <label>Following count (extra)</label>
+        <input type="number" id="epFollowingBase" value="${a.followingBase||0}" min="0">
+        <div class="hint">Added on top of however many fake accounts you actually follow below, so the total can be anything you like.</div>
+      </div>
       <button class="btn primary" style="width:100%;" onclick="saveEditProfile('${accountId}')">Save</button>
     </div>`;
     openModal(html);
@@ -421,6 +469,7 @@ function saveEditProfile(accountId){
     a.displayName = document.getElementById('epDisplayName').value.trim() || a.displayName;
     a.bio = document.getElementById('epBio').value;
     a.followers = Math.max(0, parseInt(document.getElementById('epFollowers').value)||0);
+    a.followingBase = Math.max(0, parseInt(document.getElementById('epFollowingBase').value)||0);
     a.avatar = window._pendingAvatarGetter ? window._pendingAvatarGetter() : a.avatar;
     closeModal();
     render();
@@ -439,6 +488,7 @@ function renderFollowingModal(accountId){
     <div class="modal-header"><h2>Following</h2><button class="modal-close" onclick="closeModal()">${ic('x',18)}</button></div>
     <div class="modal-body">
       <button class="btn primary" style="width:100%;margin-bottom:14px;" onclick="openCreateAccountModal('${accountId}')">${ic('plus',15)} Create new fake account</button>
+      ${a.followingBase>0?`<div class="hint" style="margin-bottom:14px;">+ ${a.followingBase} more counted in your following total but not listed here (set in Edit profile).</div>`:''}
       ${followed.length? followed.map(f=>`
         <div class="follow-list-item">
           <span onclick="goProfile('${f.id}');closeModal();" style="cursor:pointer;">${avaCircle(f,40)}</span>
@@ -555,6 +605,54 @@ function confirmDeleteAccount(accountId){
 function openNewPostModal(accountId){
     openPostForm(accountId, null);
 }
+function openPostActionSheet(accountId, postId){
+    const a = acc(accountId);
+    const post = a.posts.find(p=>p.id===postId);
+    const html = `
+    <div class="sheet">
+      <button class="sheet-btn danger" onclick="closeModal();confirmDeletePost('${accountId}','${postId}')">Delete post</button>
+      <button class="sheet-btn" onclick="closeModal();openEditStatsModal('${accountId}','${postId}')">Edit likes / comments / shares / favorites</button>
+      <button class="sheet-btn" onclick="closeModal();openPostForm('${accountId}','${postId}')">Edit post (photos/caption)</button>
+      <button class="sheet-btn" onclick="closeModal()">Cancel</button>
+    </div>`;
+    openModal(html); // or a dedicated bottom-sheet opener, see comments popup section below
+}
+
+function openEditStatsModal(accountId, postId){
+    const post = acc(accountId).posts.find(p=>p.id===postId);
+    const html = `
+    <div class="modal-header"><h2>Edit stats</h2><button class="modal-close" onclick="closeModal()">${ic('x',18)}</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Likes</label><input type="number" id="esLikes" min="0" value="${post.likes||0}"></div>
+      <div class="field"><label>Extra comments</label><input type="number" id="esExtraComments" min="0" value="${post.extraComments||0}"></div>
+      <div class="field"><label>Shares</label><input type="number" id="esShares" min="0" value="${post.shares||0}"></div>
+      <div class="field"><label>Favorites</label><input type="number" id="esFavorites" min="0" value="${post.favorites||0}"></div>
+      <div class="field"><label>Views</label><input type="number" id="esViews" min="0" value="${post.views||0}"></div>
+      <button class="btn primary" style="width:100%;" onclick="saveEditStats('${accountId}','${postId}')">Save</button>
+    </div>`;
+    openModal(html);
+}
+function saveEditStats(accountId, postId){
+    const post = acc(accountId).posts.find(p=>p.id===postId);
+    post.likes = Math.max(0, parseInt(document.getElementById('esLikes').value)||0);
+    post.extraComments = Math.max(0, parseInt(document.getElementById('esExtraComments').value)||0);
+    post.shares = Math.max(0, parseInt(document.getElementById('esShares').value)||0);
+    post.favorites = Math.max(0, parseInt(document.getElementById('esFavorites').value)||0);
+    post.views = Math.max(0, parseInt(document.getElementById('esViews').value)||0);
+    closeModal();
+    render();
+    showToast('Stats updated');
+}
+function attachSwipe(el, onLeft, onRight){
+    let startX = null;
+    el.addEventListener('touchstart', e => { startX = e.touches[0].clientX; }, {passive:true});
+    el.addEventListener('touchend', e => {
+        if(startX===null) return;
+        const dx = e.changedTouches[0].clientX - startX;
+        if(Math.abs(dx) > 40){ dx < 0 ? onLeft() : onRight(); }
+        startX = null;
+    }, {passive:true});
+}
 function openPostForm(accountId, postId){
     const a = acc(accountId);
     const post = postId ? a.posts.find(p=>p.id===postId) : null;
@@ -573,13 +671,17 @@ function openPostForm(accountId, postId){
         <label>Caption</label>
         <textarea id="pfCaption" placeholder="Write a caption...">${post?escapeHtml(post.caption):''}</textarea>
       </div>
-      <div class="field-row">
-        <div class="field">
+      <div class="field-row" style="flex-wrap:wrap;">
+        <div class="field" style="min-width:110px;">
           <label>Likes</label>
           <input type="number" id="pfLikes" min="0" value="${post?post.likes:0}">
         </div>
-        <div class="field">
-          <label>Extra comment count</label>
+        <div class="field" style="min-width:110px;">
+          <label>Shares</label>
+          <input type="number" id="pfShares" min="0" value="${post?(post.shares||0):0}">
+        </div>
+        <div class="field" style="min-width:110px;">
+          <label>Extra comments</label>
           <input type="number" id="pfExtraComments" min="0" value="${post?(post.extraComments||0):0}">
         </div>
       </div>
@@ -617,14 +719,15 @@ function savePost(accountId, postId){
     const a = acc(accountId);
     const caption = document.getElementById('pfCaption').value;
     const likes = Math.max(0, parseInt(document.getElementById('pfLikes').value)||0);
+    const shares = Math.max(0, parseInt(document.getElementById('pfShares').value)||0);
     const extraComments = Math.max(0, parseInt(document.getElementById('pfExtraComments').value)||0);
     const images = window._pfImages.slice();
     if(postId){
         const post = a.posts.find(p=>p.id===postId);
-        post.caption = caption; post.likes = likes; post.extraComments = extraComments; post.images = images;
+        post.caption = caption; post.likes = likes; post.shares = shares; post.extraComments = extraComments; post.images = images;
     } else {
         a.posts.push({
-            id: uid('post'), images, caption, likes, extraComments,
+            id: uid('post'), images, caption, likes, shares, extraComments,
             comments: [], timestamp: nowTs()
         });
     }
@@ -665,54 +768,52 @@ function openPostDetail(accountId, postId, carouselIdx){
       `:''}
     </div>` : `<div class="pd-media"><span class="noimg">No image</span></div>`;
 
+    const commentsHtml = (post.comments||[]).map((c,i)=>`
+      <div class="pd-comment">
+        <span class="txt"><b>${escapeHtml(c.author)}</b>${escapeHtml(c.text)}</span>
+        <button class="del" onclick="deleteComment('${accountId}','${postId}',${i})" aria-label="Delete comment">${ic('x',13)}</button>
+        <button class="pd-comment-like" title="Like" aria-label="Like comment">${ic('heart',15)}</button>
+      </div>
+    `).join('');
+
     const html = `
     <div class="postdetail">
       ${mediaHtml}
+      ${imgs.length>1?`<div class="dots">${imgs.map((_,i)=>
+        `<button class="${i===idx?'on':''}" onclick="openPostDetail('${accountId}','${postId}',${i})"></button>`
+    ).join('')}</div>`:''}
       <div class="pd-side">
         <div class="pd-header">
           ${avaCircle(a,32)}
           <b style="font-size:13px;cursor:pointer;" onclick="closeModal();goProfile('${accountId}')">${escapeHtml(a.username)}</b>
-          <button class="modal-close" style="margin-left:auto;" onclick="closeModal()">${ic('x',18)}</button>
-        </div>
-        <div class="pd-comments" id="pdCommentsList">
-          ${post.caption?`<div class="pd-comment"><span>${avaCircle(a,28)}</span><span class="txt"><b>${escapeHtml(a.username)}</b>${escapeHtml(post.caption)}</span></div>`:''}
-          ${(post.comments||[]).map((c,i)=>`
-            <div class="pd-comment">
-              <span class="ava" style="width:28px;height:28px;font-size:11px;">${escapeHtml((c.author||'?').charAt(0).toUpperCase())}</span>
-              <span class="txt"><b>${escapeHtml(c.author)}</b>${escapeHtml(c.text)}</span>
-              <button class="del" onclick="deleteComment('${accountId}','${postId}',${i})" aria-label="Delete comment">${ic('x',14)}</button>
-            </div>
-          `).join('')}
-          ${post.extraComments>0?`<div class="hint">+ ${post.extraComments} more comments (count only)</div>`:''}
-          ${total===0 && !post.caption ? `<div class="hint">No comments yet.</div>`:''}
+          <button class="modal-close" style="margin-left:auto;" onclick="openPostActionSheet('${accountId}','${postId}')" aria-label="Post options">${ic('dotsHoriz',20)}</button>
+          <button class="modal-close" onclick="closeModal()" aria-label="Close">${ic('x',18)}</button>
         </div>
         <div class="pd-footer">
-          <div class="pd-editnum">
-            ${ic('heart',18)}
-            <span>Likes:</span>
-            <input type="number" id="pdLikesInput" value="${post.likes||0}" min="0">
-            <button class="btn" style="flex:none;padding:4px 10px;" onclick="updateLikes('${accountId}','${postId}')">Set</button>
+           <div class="actions">
+            <button title="Likes" aria-label="Likes">${ic('heart',24)}<span class="count">${fmtNum(post.likes||0)}</span></button>
+            <button title="Comment" aria-label="Comment" onclick="document.getElementById('pdCommentText').focus()">${ic('comment',24)}<span class="count">${fmtNum(total)}</span></button>
+            <button title="Share" aria-label="Share">${ic('send',23)}<span class="count">${fmtNum(post.shares||0)}</span></button>
+            <button title="Save" aria-label="Save" style="margin-left:auto;">${ic('bookmark',23)}</button>
           </div>
-          <div class="pd-editnum">
-            ${ic('comment',18)}
-            <span>Extra comments:</span>
-            <input type="number" id="pdExtraInput" value="${post.extraComments||0}" min="0">
-            <button class="btn" style="flex:none;padding:4px 10px;" onclick="updateExtraComments('${accountId}','${postId}')">Set</button>
+          <div class="post-stats-line" style="padding:0 0 6px;cursor:default;" title="${fmtNumFull(post.likes||0)} likes, ${fmtNumFull(total)} comments, ${fmtNumFull(post.shares||0)} shares, ${fmtNumFull(post.views||0)} views">
+            <b>${fmtNum(post.likes||0)}</b> likes &nbsp;&middot;&nbsp; <b>${fmtNum(total)}</b> comments &nbsp;&middot;&nbsp; <b>${fmtNum(post.shares||0)}</b> shares &nbsp;&middot;&nbsp; <b>${fmtNum(post.views||0)}</b> views
           </div>
-          <div class="hint" style="margin-bottom:8px;" title="${fmtNumFull(post.likes||0)} likes">${fmtNum(post.likes||0)} likes &middot; ${timeAgo(post.timestamp)}</div>
+          <div class="post-time" style="padding:0 0 8px;">${timeAgo(post.timestamp)}</div>
+          <div class="pd-comments" id="pdCommentsList">
+            ${commentsHtml}
+            ${post.extraComments>0?`<div class="hint">+ ${post.extraComments} more comments not shown individually</div>`:''}
+            ${total===0 ? `<div class="hint">No comments yet.</div>`:''}
+          </div>
           <div class="addcomment-row">
             <input type="text" id="pdCommentAuthor" placeholder="Author name" style="max-width:110px;">
             <input type="text" id="pdCommentText" placeholder="Add a comment...">
             <button onclick="addComment('${accountId}','${postId}')">Post</button>
           </div>
-          <div style="display:flex;gap:8px;margin-top:10px;">
-            <button class="btn" onclick="closeModal();openPostForm('${accountId}','${postId}')">Edit post</button>
-            <button class="btn danger" onclick="confirmDeletePost('${accountId}','${postId}')">${ic('trash',15)} Delete</button>
-          </div>
         </div>
       </div>
     </div>`;
-    openModal(html, true);
+    openBottomSheet(html, 'sheet-panel--tall');
 }
 function updateLikes(accountId, postId){
     const post = acc(accountId).posts.find(p=>p.id===postId);
