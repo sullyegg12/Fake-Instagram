@@ -179,8 +179,15 @@ main{max-width:630px;margin:0 auto;padding:0 0 24px;}
 .post-caption b{margin-right:5px;font-weight:600;}
 .post-comments-link{padding:6px 12px 0;font-size:13px;color:var(--text2);background:none;border:none;display:block;}
 .post-time{padding:6px 12px 12px;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:0.3px;}
-.dots button{width:16px;height:16px;background:none;border:none;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer;}
-.dots button::before{content:'';width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,0.4);}
+@media(max-width:699px){
+    .pd-media .arrow{ display:none; }
+}
+.dots button::before{
+    display:block;
+    content:'';
+    width:5px;height:5px;border-radius:50%;
+    background:rgba(255,255,255,0.4);
+}
 .dots button.on::before{background:#fff;}
 /* ---------- profile ---------- */
 .profile-top{display:flex;gap:24px;padding:20px 16px 8px;align-items:center;}
