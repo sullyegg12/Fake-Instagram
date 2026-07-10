@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privagram</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+    <div class="logo">Privagram</div>
+    <div class="actions">
+        <button class="icon-btn" id="btnFeedIconTop" title="Feed" aria-label="Feed"></button>
+        <button class="icon-btn" id="btnNewPostTop" title="New post" aria-label="New post"></button>
+        <button class="avatar-btn" id="btnAvatarMenu" title="Account" aria-label="Account">
+            <span id="topAvatarWrap"></span>
+        </button>
+    </div>
+</header>
+
+<main id="app"></main>
+
+<nav class="bottomnav">
+    <button id="navFeed" title="Feed" aria-label="Feed"></button>
+    <button id="navNew" title="New post" aria-label="New post"></button>
+    <button id="navProfile" title="Profile" aria-label="Profile"><span class="navProfileAva" id="navProfileAvaWrap"></span></button>
+</nav>
+
+<div id="toast" class="toast"></div>
+
+<div id="modalRoot"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
