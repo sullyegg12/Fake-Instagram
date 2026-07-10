@@ -86,13 +86,35 @@ header .actions{display:flex;align-items:center;gap:18px;}
     width:100%;text-align:left;background:none;border:none;padding:10px 14px;font-size:14px;
     display:flex;align-items:center;gap:10px;color:var(--text);border-bottom:1px solid var(--border);
 }
+.sheet-panel--tall{ height:55vh; max-height:55vh; display:flex; flex-direction:column; }
+.sheet-panel--tall .postdetail{ height:100%; }
+.sheet-panel--tall .postdetail .pd-side{ flex:1; overflow-y:auto; }
+.sheet-panel--tall .pd-media{ min-height:0; flex-shrink:0; max-height:38vh; }
 .dropdown-plain-btn:hover{background:#1a1a1a;}
 .dropdown-plain-btn.danger{color:var(--red);}
 .ava{border-radius:50%;object-fit:cover;background:var(--surface-raised);flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#8e8e8e;font-weight:600;}
-
+.overlay{ align-items:flex-end;} /* change existing .overlay from center to bottom-anchored */
+.sheet-panel{
+    background:var(--surface-raised);
+    width:100%;
+    max-width:630px;
+    max-height:88vh;
+    border-radius:16px 16px 0 0;
+    overflow-y:auto;
+    animation:slideUp .22s ease-out;
+}
+@keyframes slideUp{ from{transform:translateY(100%);} to{transform:translateY(0);} }
 /* ---------- container ---------- */
 main{max-width:630px;margin:0 auto;padding:0 0 24px;}
-
+.overlay.sheet-overlay{ align-items:flex-end; padding:0; }
+.sheet-btn{
+    display:block;width:100%;text-align:center;background:none;border:none;
+    padding:16px;font-size:15px;font-weight:500;color:var(--text);
+    border-bottom:1px solid var(--border);
+}
+.sheet-btn:last-child{ border-bottom:none; }
+.sheet-btn:active{ background:#1a1a1a; }
+.sheet-btn.danger{ color:var(--red); font-weight:600; }
 /* ---------- bottom nav (mobile) ---------- */
 .bottomnav{
     position:fixed;bottom:0;left:0;right:0;
@@ -103,9 +125,6 @@ main{max-width:630px;margin:0 auto;padding:0 0 24px;}
 .bottomnav button{background:none;border:none;color:var(--text2);padding:2px 18px;display:flex;}
 .bottomnav button.active{color:var(--text);}
 .bottomnav button.active svg{stroke-width:2.3;}
-.navProfileAva{width:24px;height:24px;border-radius:50%;overflow:hidden;border:1px solid transparent;}
-.navProfileAva.active{border-color:var(--text);}
-.navProfileAva img{width:100%;height:100%;object-fit:cover;}
 
 /* ---------- feed ---------- */
 .post-card{
@@ -146,15 +165,23 @@ main{max-width:630px;margin:0 auto;padding:0 0 24px;}
     background:rgba(0,0,0,0.55);color:#fff;font-size:11px;
     padding:2px 7px;border-radius:10px;
 }
-
+.postpage-topbar{
+    position:sticky;top:0;z-index:40;background:var(--bg);border-bottom:1px solid var(--border);
+    display:flex;align-items:center;gap:14px;padding:10px 12px;
+}
+.postpage-topbar .back-btn{ background:none;border:none;color:var(--text);display:flex; }
+.postpage-topbar b{ font-size:15px;font-weight:600; }
 .post-actions{display:flex;align-items:center;gap:16px;padding:10px 12px 0;}
 .post-actions button{background:none;border:none;color:var(--text);padding:0;display:flex;}
-.post-likes{padding:8px 12px 0;font-size:13px;font-weight:600;}
+.post-stats-line{padding:8px 12px 0;font-size:13px;color:var(--text);cursor:pointer;}
+.post-stats-line b{font-weight:600;}
 .post-caption{padding:6px 12px 0;font-size:13px;line-height:1.4;}
 .post-caption b{margin-right:5px;font-weight:600;}
 .post-comments-link{padding:6px 12px 0;font-size:13px;color:var(--text2);background:none;border:none;display:block;}
 .post-time{padding:6px 12px 12px;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:0.3px;}
-
+.dots button{width:16px;height:16px;background:none;border:none;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.dots button::before{content:'';width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,0.4);}
+.dots button.on::before{background:#fff;}
 /* ---------- profile ---------- */
 .profile-top{display:flex;gap:24px;padding:20px 16px 8px;align-items:center;}
 .profile-avatar-lg{width:84px;height:84px;flex-shrink:0;}
@@ -240,6 +267,13 @@ main{max-width:630px;margin:0 auto;padding:0 0 24px;}
     width:64px;height:64px;border-radius:6px;border:1px dashed var(--border-strong);background:var(--input-bg);
     color:var(--text2);display:flex;align-items:center;justify-content:center;
 }
+.pd-media .arrow{
+    position:absolute;top:50%;transform:translateY(-50%);
+    background:rgba(0,0,0,0.55);border:none;border-radius:50%;
+    width:32px;height:32px;color:#fff;display:flex;align-items:center;justify-content:center;
+}
+.pd-media .arrow.left{ left:8px; }
+.pd-media .arrow.right{ right:8px; }
 
 /* post detail modal split layout on wide */
 .postdetail{display:flex;flex-direction:column;}
@@ -248,14 +282,19 @@ main{max-width:630px;margin:0 auto;padding:0 0 24px;}
     .postdetail .pd-media{flex:1.1;}
     .postdetail .pd-side{flex:1;display:flex;flex-direction:column;border-left:1px solid var(--border);overflow-y:auto;}
 }
+.post-actions button, .pd-footer .actions button{ align-items:center; gap:5px; }
+.post-actions .count, .pd-footer .actions .count{ font-size:13px; font-weight:600; color:var(--text); }
 .pd-media{position:relative;background:#000;min-height:280px;display:flex;align-items:center;justify-content:center;}
 .pd-media img{max-width:100%;max-height:100%;width:100%;height:100%;object-fit:contain;}
 .pd-side{padding:0;}
 .pd-header{display:flex;align-items:center;gap:10px;padding:12px;border-bottom:1px solid var(--border);}
-.pd-comments{flex:1;padding:12px;overflow-y:auto;max-height:260px;}
-.pd-comment{display:flex;gap:8px;margin-bottom:12px;font-size:13px;align-items:flex-start;}
-.pd-comment .txt b{margin-right:5px;font-weight:600;}
-.pd-comment .del{margin-left:auto;background:none;border:none;color:var(--text2);flex-shrink:0;display:flex;}
+.pd-comments{ padding:4px 0 8px; overflow-y:auto; max-height:140px; }
+.pd-comment{ display:flex; align-items:center; gap:8px; padding:6px 0; font-size:13px; border-bottom:1px solid var(--border); }
+.pd-comment:last-child{ border-bottom:none; }
+.pd-comment .txt{ flex:1; min-width:0; }
+.pd-comment .txt b{ margin-right:5px; font-weight:600; }
+.pd-comment .del{ background:none;border:none;color:var(--text2);flex-shrink:0;display:flex; }
+.pd-comment-like{ background:none;border:none;color:var(--text);flex-shrink:0;display:flex; }
 .pd-footer{border-top:1px solid var(--border);padding:10px 12px;}
 .pd-footer .actions{display:flex;gap:16px;margin-bottom:8px;}
 .pd-footer .actions button{background:none;border:none;color:var(--text);display:flex;}
