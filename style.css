@@ -157,9 +157,9 @@ main{max-width:630px;margin:0 auto;padding:0 0 24px;}
 }
 .post-media .arrow.left{left:8px;}
 .post-media .arrow.right{right:8px;}
-.post-media .dots{position:absolute;bottom:8px;left:0;right:0;display:flex;justify-content:center;gap:4px;}
-.post-media .dots span{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,0.4);}
-.post-media .dots span.on{background:#fff;}
+.post-media .dots{ position:absolute;bottom:8px;left:0;right:0;display:flex;justify-content:center;gap:3px; }
+.post-media .dots span{ display:block;width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,0.45); }
+.post-media .dots span.on{ background:#fff; }
 .img-count{
     position:absolute;top:8px;right:8px;
     background:rgba(0,0,0,0.55);color:#fff;font-size:11px;
@@ -182,13 +182,6 @@ main{max-width:630px;margin:0 auto;padding:0 0 24px;}
 @media(max-width:699px){
     .pd-media .arrow{ display:none; }
 }
-.dots button::before{
-    display:block;
-    content:'';
-    width:5px;height:5px;border-radius:50%;
-    background:rgba(255,255,255,0.4);
-}
-.dots button.on::before{background:#fff;}
 /* ---------- profile ---------- */
 .profile-top{display:flex;gap:24px;padding:20px 16px 8px;align-items:center;}
 .profile-avatar-lg{width:84px;height:84px;flex-shrink:0;}
