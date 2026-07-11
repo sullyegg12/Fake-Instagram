@@ -157,6 +157,7 @@ function render(){
     const app = document.getElementById('app');
     if(state.view === 'feed'){
         app.innerHTML = renderFeedHTML();
+        attachFeedSwipes();
     } else if(state.view === 'postpage'){
         app.innerHTML = renderPostPageHTML(state.postPageAccountId, state.postPagePostId);
     } else {
@@ -165,7 +166,6 @@ function render(){
     document.getElementById('navFeed').classList.toggle('active', state.view==='feed');
     document.getElementById('navProfile').classList.toggle('active', state.view==='profile' || state.view==='postpage');
 }
-
 /* ============================= FEED ============================= */
 function renderFeedHTML(){
     const main = mainAcc();
@@ -197,7 +197,7 @@ function renderPostCard(post, account, restricted){
     const total = commentTotal(post);
     const goProfileAttr = restricted ? '' : `onclick="goProfile('${account.id}')"`;
     return `
-  <div class="post-card">
+  <div class="post-card" id="card-${post.id}">
     <div class="post-head">
       <a ${goProfileAttr} style="${restricted?'cursor:default;':''}">${avaCircle(account,32)}</a>
       <div class="who" ${goProfileAttr} style="${restricted?'cursor:default;':''}">
@@ -212,25 +212,50 @@ function renderPostCard(post, account, restricted){
       <button title="Shares" aria-label="Shares">${ic('send',23)}<span class="count">${fmtNum(post.shares||0)}</span></button>
       <button title="Save" aria-label="Save" style="margin-left:auto;">${ic('bookmark',23)}</button>
     </div>
-    <div class="post-stats-line" title="${fmtNumFull(post.likes||0)} likes, ${fmtNumFull(total)} comments, ${fmtNumFull(post.shares||0)} shares, ${fmtNumFull(post.views||0)} views" onclick="openPostDetail('${account.id}','${post.id}')">
-      <b>${fmtNum(post.likes||0)}</b> likes &nbsp;&middot;&nbsp; <b>${fmtNum(total)}</b> comments &nbsp;&middot;&nbsp; <b>${fmtNum(post.shares||0)}</b> shares &nbsp;&middot;&nbsp; <b>${fmtNum(post.views||0)}</b> views
-    </div>
     ${post.caption ? `<div class="post-caption"><b>${escapeHtml(account.username)}</b>${escapeHtml(post.caption)}</div>` : ''}
     <div class="post-time">${timeAgo(post.timestamp)}</div>
   </div>`;
 }
+const _carouselIdx = {};
+
+function swipeFeedCard(accountId, postId, dir){
+    const a = acc(accountId);
+    const post = a.posts.find(p=>p.id===postId);
+    if(!post) return;
+    const imgs = post.images||[];
+    const cur = _carouselIdx[postId]||0;
+    const next = Math.max(0, Math.min(imgs.length-1, cur+dir));
+    if(next===cur) return;
+    _carouselIdx[postId] = next;
+    const card = document.getElementById('card-'+postId);
+    if(card) card.outerHTML = renderPostCard(post, a);
+    attachFeedSwipes();
+}
+
+function attachFeedSwipes(){
+    document.querySelectorAll('.post-media[data-postid]').forEach(el=>{
+        const accountId = el.dataset.accountid;
+        const postId = el.dataset.postid;
+        if(!postId || !accountId) return;
+        if((parseInt(el.dataset.count)||1) < 2) return;
+        attachSwipe(el,
+            ()=> swipeFeedCard(accountId, postId, 1),
+            ()=> swipeFeedCard(accountId, postId, -1)
+        );
+    });
+}
 
 function renderPostMedia(post, carouselIdx, accountId, postId){
     const imgs = post.images||[];
-    const idx = carouselIdx||0;
+    const idx = (postId && _carouselIdx[postId]!==undefined) ? _carouselIdx[postId] : (carouselIdx||0);
     if(imgs.length===0){
         return `<div class="post-media"><span class="noimg">No image</span></div>`;
     }
     const dots = imgs.length>1 ? `<div class="dots">${imgs.map((_,i)=>
-        `<button class="${i===idx?'on':''}" onclick="event.stopPropagation();openPostDetail('${accountId}','${postId}',${i})"></button>`
+        `<span class="${i===idx?'on':''}"></span>`
     ).join('')}</div>` : '';
     const count = imgs.length>1 ? `<div class="img-count">${idx+1}/${imgs.length}</div>` : '';
-    return `<div class="post-media" data-idx="${idx}" data-count="${imgs.length}">
+    return `<div class="post-media" data-postid="${postId||''}" data-accountid="${accountId||''}" data-idx="${idx}" data-count="${imgs.length}">
       <img src="${imgs[idx]}">
       ${count}
       ${dots}
